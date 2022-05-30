@@ -1,0 +1,51 @@
+[package]
+name = "bumper-defense"
+version = "0.1.0"
+edition = "2021"
+
+# Useful inspiration from https://github.com/NiklasEi/bevy_game_template
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[features]
+default = [
+    "bevy/bevy_winit",
+    "bevy/render",
+    "bevy/png",
+    "bevy/x11"
+]
+
+dev = [
+    "bevy/dynamic",
+]
+
+[dependencies]
+bevy = { version = "0.7", default-features = false }
+# TODO: remove debug-2d feature
+heron = { version = "3", features = ["2d", "debug-2d"] }
+clap = { version = "^3", features = ["cargo"] }
+rand = "*"
+bevy_prototype_lyon = "0.5.0"
+
+
+[target.'cfg(target_os = "linux")'.dependencies]
+winit = { version = "0.25", features=["x11"]}
+
+[build-dependencies]
+embed-resource = "1.4"
+
+# Alternative 100% shared libs (useful with "cargo run")
+#
+# [dependencies]
+# bevy = { version = "0.7.0", features = ["dynamic"] }
+# heron = { version = "3", features = ["2d", "debug-2d"] }
+# rand = "*"
+#
