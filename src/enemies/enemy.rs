@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use core::f32::consts::PI;
 
 use rand::{thread_rng, Rng};
 
@@ -16,7 +17,9 @@ const COLLISION_SHAPE: CollisionShape = CollisionShape::Cuboid {
 };
 
 const MAX_LIFE: f32 = 100.0;
-const MAX_BULLETS: usize = 10;
+const MAX_BULLETS: usize = 25;
+
+pub struct ShootTimer(Timer);
 
 #[derive(Component)]
 pub struct Enemy {
@@ -28,6 +31,72 @@ pub struct Enemy {
 
 #[derive(Component)]
 pub struct Shooter;
+
+pub fn get_timer_resource() -> ShootTimer {
+    ShootTimer(Timer::from_seconds(1.0, true))
+}
+
+fn calculate_velocity2(translation: Vec3) -> Velocity {
+    let mut rng = thread_rng();
+    let mut angle: f32 = PI / rng.gen_range(3.0..6.0);
+    let x_force = 200.0 - translation.x;
+    Velocity::from_linear(Vec3::new(
+        x_force * angle.sin(),
+        x_force.abs() * angle.cos(),
+        0.0
+    ))
+}
+
+
+fn calculate_velocity3(translation: Vec3) -> Velocity {
+    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
+    let mut rng = thread_rng();
+    let mut angle: f32 = PI / rng.gen_range(3.0..6.0);
+    let x_force = 200.0 - translation.x;
+    let distance = 200.0 - translation.x;
+
+    let vertical: f32 = rng.gen_range(80.0..600.0);
+    let t = 2.0 * vertical / 600.0;
+
+    let horizontal = distance / t;
+
+    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
+    //println!("H {} V {]")
+
+
+    Velocity::from_linear(Vec3::new(
+        horizontal,
+        vertical,
+        0.0
+    ))
+}
+
+
+fn calculate_velocity(translation: Vec3) -> Velocity {
+    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
+    let mut rng = thread_rng();
+    let distance = 200.0 - translation.x;
+
+    let vertical: f32 = rng.gen_range(80.0..600.0);
+    let g = 600.0;
+
+
+    let t = (vertical + ((vertical * vertical) + 2.0 * translation.y * g).sqrt()) / g;
+
+    let horizontal = distance / t;
+
+    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
+    //println!("H {} V {]")
+
+
+    Velocity::from_linear(Vec3::new(
+        horizontal,
+        vertical,
+        0.0
+    ))
+}
+
+
 
 impl Enemy {
     pub fn new(id: usize) -> Enemy {
@@ -44,7 +113,7 @@ impl Enemy {
         let mut rng = thread_rng();
         SpriteBundle {
             transform: Transform {
-                translation: Vec3::new(-30.0, rng.gen_range(100.0..700.0), 0.0),
+                translation: Vec3::new(-30.0, rng.gen_range(100.0..560.0), 0.0),
                 scale: ENEMY_SIZE,
                 ..default()
             },
@@ -96,8 +165,14 @@ pub fn manage_enemy(
 
 pub fn shoot(
     mut commands: Commands,
+    time: Res<Time>,
+    mut shoot_timer: ResMut<ShootTimer>,
+    asset_server: Res<AssetServer>,
     mut enemy: Query<(&mut Enemy, &mut Transform, Entity), With<Shooter>>,
 ) {
+    if !shoot_timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
     for (mut e, transform, entity) in enemy.iter_mut() {
         if e.bullets < 1 {
             commands.entity(entity).despawn();
@@ -107,32 +182,39 @@ pub fn shoot(
         e.shoot();
         let mut rng = thread_rng();
         commands
-            .spawn_bundle((
-                Transform::from_translation(Vec3::new(
-                    transform.translation.x,
-                    transform.translation.y,
-                    0.0,
-                )),
-                GlobalTransform::default(),
-            ))
+            .spawn_bundle(SpriteBundle {
+                transform: Transform {
+                    translation: Vec3::new(transform.translation.x, transform.translation.y, 0.0),
+                    scale: const_vec3!([0.046, 0.046, 1.0]),
+                    ..default()
+                },
+                texture: asset_server.load("ball2.png"),
+                ..default()
+            })
             .insert(RigidBody::Dynamic)
-            .insert(CollisionShape::Sphere { radius: 11.0 })
-            .insert(Velocity::from_linear(Vec3::X * rng.gen_range(50.0..150.0)))
+            .insert(CollisionShape::Sphere { radius: 3.7 })
+            .insert(calculate_velocity(transform.translation))
             .insert(PhysicMaterial {
-                friction: rng.gen_range(0.1..10.0),
-                density: rng.gen_range(0.5..100.0),
+                friction: rng.gen_range(0.1..0.2),
+                density: 2.0,
                 restitution: rng.gen_range(0.1..0.95),
             })
             .insert(RotationConstraints::allow())
             .insert(
                 CollisionLayers::none()
                     .with_group(world::Layer::Projectiles)
-                    .with_masks(&[world::Layer::World, world::Layer::Bumpers]),
+                    .with_masks(&[
+                        world::Layer::World,
+                        world::Layer::Bumpers,
+                        world::Layer::Projectiles,
+                    ]),
             );
     }
 }
 
 // d = V₀ * cos(α) * [V₀ * sin(α) + √((V₀ * sin(α))² + 2 * g * h)] / g
+
+// t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
 
 pub fn manage_enemy_movement(
     mut commands: Commands,

@@ -223,7 +223,7 @@ fn create_world(mut commands: Commands) {
         .spawn_bundle(SpriteBundle {
             transform: Transform {
                 translation: Vec3::new(-0.0, -300., 0.0),
-                scale: const_vec3!([700.0, 20.0, 0.0]),
+                scale: Vec3::new(700.0, 20.0, 0.0),
                 ..default()
             },
             sprite: Sprite {
