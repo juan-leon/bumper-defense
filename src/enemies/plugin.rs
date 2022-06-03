@@ -13,6 +13,8 @@ impl Plugin for EnemyPlugin {
             .add_system(spawner::spawn_enemy)
             .add_system(enemy::manage_enemy_movement)
             .add_system(enemy::shoot)
+            .add_system(enemy::collision_dectector)
+            .add_system(enemy::landed_system)
             .add_system(enemy::manage_enemy);
     }
 }

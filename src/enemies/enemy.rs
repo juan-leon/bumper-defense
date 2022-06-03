@@ -5,6 +5,7 @@ use rand::{thread_rng, Rng};
 
 use bevy::math::{const_vec3, Vec3};
 use heron::prelude::*;
+use heron::CollisionData;
 
 use crate::enemies::spawner::Spawner;
 use crate::world;
@@ -17,7 +18,7 @@ const COLLISION_SHAPE: CollisionShape = CollisionShape::Cuboid {
 };
 
 const MAX_LIFE: f32 = 100.0;
-const MAX_BULLETS: usize = 25;
+const MAX_BULLETS: usize = 10;
 
 pub struct ShootTimer(Timer);
 
@@ -31,6 +32,14 @@ pub struct Enemy {
 
 #[derive(Component)]
 pub struct Shooter;
+
+
+#[derive(Component)]
+pub struct Projectile;
+
+#[derive(Component)]
+pub struct Landed;
+
 
 pub fn get_timer_resource() -> ShootTimer {
     ShootTimer(Timer::from_seconds(1.0, true))
@@ -104,7 +113,7 @@ impl Enemy {
         Enemy {
             id: id,
             life: MAX_LIFE,
-            target_x: rng.gen_range(-600.0..900.0),
+            target_x: rng.gen_range(50.0..900.0),
             bullets: MAX_BULLETS,
         }
     }
@@ -200,6 +209,7 @@ pub fn shoot(
                 restitution: rng.gen_range(0.1..0.95),
             })
             .insert(RotationConstraints::allow())
+            .insert(Projectile)  // TODO remove
             .insert(
                 CollisionLayers::none()
                     .with_group(world::Layer::Projectiles)
@@ -219,7 +229,7 @@ pub fn shoot(
 pub fn manage_enemy_movement(
     mut commands: Commands,
     mut spawner: ResMut<Spawner>,
-    mut enemy: Query<(&Enemy, &mut Transform, &mut Velocity, Entity)>,
+    mut enemy: Query<(&Enemy, &Transform, &mut Velocity, Entity)>,
 ) {
     for (e, transform, mut velocity, entity) in enemy.iter_mut() {
         if velocity.linear == Vec3::ZERO {
@@ -231,5 +241,120 @@ pub fn manage_enemy_movement(
                 velocity.linear = Vec3::ZERO;
             }
         }
+    }
+}
+
+
+pub fn collision_tester(
+    mut commands: Commands,
+    mut enemy: Query<&Collisions>,
+) {
+    for (collisions) in enemy.iter_mut() {
+        println!("in outer loop");
+        if !collisions.is_empty() {
+            println!("Touching!");
+            for e in collisions.iter() {
+                println!("Inner loop {:?}", e);
+            }
+        }
+    }
+}
+
+pub fn collision_tester4(
+    mut commands: Commands,
+    mut enemy: Query<(&Collisions, &mut Transform, Entity), With<Projectile>>,
+) {
+    for (collisions, transform, entity) in enemy.iter_mut() {
+        println!("Proj {:?}", entity);
+        if !collisions.is_empty() {
+            println!("Touching!");
+            for e in collisions.iter() {
+                println!("Proj {:?} touches {:?} at {:?}", entity, e, transform.translation);
+            }
+        }
+    }
+}
+
+
+pub fn collision_tester3(
+    mut commands: Commands,
+    mut collision_events: EventReader<'_, '_, CollisionEvent>,
+    mut enemy: Query<(&mut Transform, Entity), With<Projectile>>,
+) {
+    for (transform, entity) in enemy.iter_mut() {
+        println!("Proj {:?}", entity);
+    }
+    for event in collision_events.iter() {
+        // println!("Event {:?}", event);
+        let (data1, data2) = event.clone().data();
+        // println!("Data {:?} {:?}", data1, data2);
+        let (entity1, entity2) = (data1.rigid_body_entity(), data2.rigid_body_entity());
+        println!("Entities {:?} {:?}", entity1, entity2);
+
+        // if event.is_started() {
+        //     commands.entity(entity2).despawn();
+        //     if let Ok(mut entities) = collisions.get_mut(entity1) {
+        //         println!("11");
+        //     }
+        //     if let Ok(mut entities) = collisions.get_mut(entity2) {
+        //         println!("22");
+        //     }
+        // } else {
+        //     if let Ok(mut entities) = collisions.get_mut(entity1) {
+        //         println!("33");
+        //     }
+        //     if let Ok(mut entities) = collisions.get_mut(entity2) {
+        //         println!("44");
+        //     }
+        // }
+    }
+}
+
+
+pub fn collision_dectector(
+    mut commands: Commands,
+    mut collision_events: EventReader<'_, '_, CollisionEvent>,
+) {
+    for event in collision_events.iter() {
+        if event.is_started() {
+            // println!("Event {:?}", event);
+            let (data1, data2) = event.clone().data();
+            let (layers1, layers2) = (data1.collision_layers(), data2.collision_layers());
+            let mut projectile: Option<CollisionData> = None;
+            if layers1.contains_group(world::Layer::Projectiles) && layers2.contains_group(world::Layer::World) {
+                projectile = Some(data1);
+            } else if layers2.contains_group(world::Layer::Projectiles) && layers1.contains_group(world::Layer::World) {
+                projectile = Some(data2);
+            }
+            match projectile {
+                Some(data) => {
+                    commands.entity(data.rigid_body_entity()).insert(Landed);
+                },
+                None => (),
+            }
+            // let (entity1, entity2) = (data1.rigid_body_entity(), data2.rigid_body_entity());
+            // if landed(data1) {
+            //     println!("Entity1 {:?} landed (col with {:?})", entity1, entity2);
+            //     commands.entity(entity1).insert(Landed);
+            // } else if landed(data2) {
+            //     println!("Entity2 {:?} landed (col with {:?})", entity2, entity1);
+            //     commands.entity(entity2).insert(Landed);
+            // }
+        }
+    }
+}
+
+pub fn landed(data: CollisionData) -> bool {
+    let layers = data.collision_layers();
+    layers.contains_group(world::Layer::Projectiles) && layers.contains_mask(world::Layer::World)
+}
+
+pub fn landed_system(
+    mut commands: Commands,
+    mut enemy: Query<(&Transform, &Velocity, Entity), Added<Landed>>,
+) {
+    for (transform, mut velocity, entity) in enemy.iter() {
+        println!("Proj {:?} landed", entity);
+        commands.entity(entity).despawn();
     }
 }
