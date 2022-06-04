@@ -8,6 +8,7 @@ use heron::prelude::*;
 use heron::CollisionData;
 
 use crate::enemies::spawner::Spawner;
+use crate::enemies::projectile::{Projectile, LandEffect};
 use crate::world;
 
 const ENEMY_SIDE: f32 = 20.0;
@@ -33,9 +34,6 @@ pub struct Enemy {
 #[derive(Component)]
 pub struct Shooter;
 
-
-#[derive(Component)]
-pub struct Projectile;
 
 #[derive(Component)]
 pub struct Landed;
@@ -154,8 +152,9 @@ impl Enemy {
             .insert(enemy);
     }
 
-    pub fn shoot(&mut self) {
+    pub fn shoot(&mut self) -> Projectile {
         self.bullets -= 1;
+        Projectile::new()
     }
 }
 
@@ -177,7 +176,7 @@ pub fn shoot(
     time: Res<Time>,
     mut shoot_timer: ResMut<ShootTimer>,
     asset_server: Res<AssetServer>,
-    mut enemy: Query<(&mut Enemy, &mut Transform, Entity), With<Shooter>>,
+    mut enemy: Query<(&mut Enemy, &Transform, Entity), With<Shooter>>,
 ) {
     if !shoot_timer.0.tick(time.delta()).just_finished() {
         return;
@@ -187,44 +186,14 @@ pub fn shoot(
             commands.entity(entity).despawn();
             continue;
         }
-        commands.entity(entity).remove::<Velocity>();
-        e.shoot();
-        let mut rng = thread_rng();
-        commands
-            .spawn_bundle(SpriteBundle {
-                transform: Transform {
-                    translation: Vec3::new(transform.translation.x, transform.translation.y, 0.0),
-                    scale: const_vec3!([0.046, 0.046, 1.0]),
-                    ..default()
-                },
-                texture: asset_server.load("ball2.png"),
-                ..default()
-            })
-            .insert(RigidBody::Dynamic)
-            .insert(CollisionShape::Sphere { radius: 3.7 })
-            .insert(calculate_velocity(transform.translation))
-            .insert(PhysicMaterial {
-                friction: rng.gen_range(0.1..0.2),
-                density: 2.0,
-                restitution: rng.gen_range(0.1..0.95),
-            })
-            .insert(RotationConstraints::allow())
-            .insert(Projectile)  // TODO remove
-            .insert(
-                CollisionLayers::none()
-                    .with_group(world::Layer::Projectiles)
-                    .with_masks(&[
-                        world::Layer::World,
-                        world::Layer::Bumpers,
-                        world::Layer::Projectiles,
-                    ]),
-            );
+        let projectile = e.shoot();
+        commands.spawn_bundle(
+            projectile.sprite(transform.translation, asset_server.as_ref())
+        )
+            .insert_bundle(projectile.get_bundle(transform.translation))
+            .insert(projectile);
     }
 }
-
-// d = V₀ * cos(α) * [V₀ * sin(α) + √((V₀ * sin(α))² + 2 * g * h)] / g
-
-// t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
 
 pub fn manage_enemy_movement(
     mut commands: Commands,
@@ -290,23 +259,6 @@ pub fn collision_tester3(
         // println!("Data {:?} {:?}", data1, data2);
         let (entity1, entity2) = (data1.rigid_body_entity(), data2.rigid_body_entity());
         println!("Entities {:?} {:?}", entity1, entity2);
-
-        // if event.is_started() {
-        //     commands.entity(entity2).despawn();
-        //     if let Ok(mut entities) = collisions.get_mut(entity1) {
-        //         println!("11");
-        //     }
-        //     if let Ok(mut entities) = collisions.get_mut(entity2) {
-        //         println!("22");
-        //     }
-        // } else {
-        //     if let Ok(mut entities) = collisions.get_mut(entity1) {
-        //         println!("33");
-        //     }
-        //     if let Ok(mut entities) = collisions.get_mut(entity2) {
-        //         println!("44");
-        //     }
-        // }
     }
 }
 
@@ -332,14 +284,6 @@ pub fn collision_dectector(
                 },
                 None => (),
             }
-            // let (entity1, entity2) = (data1.rigid_body_entity(), data2.rigid_body_entity());
-            // if landed(data1) {
-            //     println!("Entity1 {:?} landed (col with {:?})", entity1, entity2);
-            //     commands.entity(entity1).insert(Landed);
-            // } else if landed(data2) {
-            //     println!("Entity2 {:?} landed (col with {:?})", entity2, entity1);
-            //     commands.entity(entity2).insert(Landed);
-            // }
         }
     }
 }
@@ -351,10 +295,16 @@ pub fn landed(data: CollisionData) -> bool {
 
 pub fn landed_system(
     mut commands: Commands,
-    mut enemy: Query<(&Transform, &Velocity, Entity), Added<Landed>>,
+    mut enemy: Query<(&Transform, &mut Projectile, Entity), With<Landed>>,
 ) {
-    for (transform, mut velocity, entity) in enemy.iter() {
-        println!("Proj {:?} landed", entity);
-        commands.entity(entity).despawn();
+    for (transform, mut projectile, entity) in enemy.iter_mut() {
+        match projectile.touch_ground() {
+            LandEffect::Bounce => {
+                commands.entity(entity).remove::<Landed>();
+            }
+            LandEffect::Explode => {
+                commands.entity(entity).despawn();
+            }
+        }
     }
 }

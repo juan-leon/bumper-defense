@@ -15,8 +15,6 @@ use bevy::math::{const_vec3, Vec2, Vec3};
 
 mod cli;
 
-const GRAVITY: f32 = -600.;
-
 const CLEAR: Color = Color::rgb(0.1, 0.1, 0.1);
 const SQUARE_SIZE: Vec3 = const_vec3!([20.0, 20.0, 0.0]);
 const CUBOID_EXTENDS: Vec3 = const_vec3!([10.0, 10.0, 0.0]);
@@ -32,7 +30,6 @@ fn main() {
     let mut app = App::new();
 
     app.insert_resource(world::create_window(matches.value_of_t_or_exit("width")))
-        .insert_resource(Gravity::from(Vec3::Y * GRAVITY))
         .insert_resource(Msaa { samples: 4 })
         .insert_resource(DropTimer(Timer::from_seconds(1.0, true)))
         .add_plugins(DefaultPlugins);

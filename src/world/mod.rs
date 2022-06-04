@@ -2,6 +2,7 @@ pub use self::plugin::WorldPlugin;
 
 mod landscape;
 mod plugin;
+mod systems;
 
 use bevy::ecs::system::Commands;
 use bevy::render::camera::{OrthographicCameraBundle, ScalingMode};
@@ -9,6 +10,7 @@ use bevy::window::WindowDescriptor;
 
 use heron::PhysicsLayer;
 
+pub const GRAVITY: f32 = 600.;
 const ASPECT_RATIO: f32 = 9.0 / 16.0;
 const VISIBLE_WORLD_WIDTH: f32 = 1000.0;
 const VISIBLE_WORLD_HEIGHT: f32 = VISIBLE_WORLD_WIDTH * ASPECT_RATIO;
