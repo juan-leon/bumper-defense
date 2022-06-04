@@ -1,6 +1,6 @@
-use bevy::core::{Time, Timer};
+use bevy::core::Timer;
 use bevy::ecs::component::Component;
-use bevy::ecs::system::{Commands, Res, ResMut};
+use bevy::utils::Duration;
 
 use crate::enemies::enemy::Enemy;
 
@@ -22,22 +22,23 @@ impl Spawner {
         }
     }
 
-    pub fn spawn(&mut self, mut commands: Commands) {
-        if self.enemy_count >= MAX_ENEMIES {
-            return;
-        }
+    fn spawn(&mut self) -> Enemy {
         self.enemy_count += 1;
         self.enemies_spawned += 1;
-        Enemy::spawn(self.enemies_spawned, commands);
+        Enemy::create_random()
+    }
+
+    pub fn spawn_if_ready(&mut self, duration: Duration) -> Option<Enemy> {
+        if !self.timer.tick(duration).just_finished() {
+            None
+        } else if self.enemy_count >= MAX_ENEMIES {
+            None
+        } else {
+            Some(self.spawn())
+        }
     }
 
     pub fn despawn(&mut self) {
         self.enemy_count -= 1;
-    }
-}
-
-pub fn spawn_enemy(mut commands: Commands, time: Res<Time>, mut spawner: ResMut<Spawner>) {
-    if spawner.timer.tick(time.delta()).just_finished() {
-        spawner.spawn(commands);
     }
 }

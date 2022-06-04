@@ -1,14 +1,17 @@
-use bevy::prelude::*;
-use core::f32::consts::PI;
-
+use bevy::core::Timer;
+use bevy::ecs::bundle::Bundle;
+use bevy::ecs::component::Component;
+use bevy::math::{const_vec3, Vec2, Vec3};
+use bevy::render::color::Color;
+use bevy::sprite::{Sprite, SpriteBundle};
+use bevy::transform::components::Transform;
+use bevy::utils::Duration;
+use heron::{CollisionLayers, CollisionShape, PhysicMaterial, RigidBody, Velocity};
+use rand::distributions::{Distribution, Standard};
 use rand::{thread_rng, Rng};
 
-use bevy::math::{const_vec3, Vec3};
-use heron::prelude::*;
-use heron::CollisionData;
-
-use crate::enemies::spawner::Spawner;
-use crate::enemies::projectile::{Projectile, LandEffect};
+use crate::enemies::projectile::{Projectile, ProjectileType};
+use crate::util::lifebar::Lifebar;
 use crate::world;
 
 const ENEMY_SIDE: f32 = 20.0;
@@ -18,293 +21,251 @@ const COLLISION_SHAPE: CollisionShape = CollisionShape::Cuboid {
     border_radius: None,
 };
 
-const MAX_LIFE: f32 = 100.0;
-const MAX_BULLETS: usize = 10;
+const INITIAL_VELOCITY: f32 = 100.0;
+const DECELERATION: f32 = 0.97;
 
-pub struct ShootTimer(Timer);
-
-#[derive(Component)]
-pub struct Enemy {
-    id: usize,
-    life: f32,
-    target_x: f32,
-    bullets: usize,
+pub enum ShootResult {
+    Fire(Projectile),
+    GoAway(Velocity),
+    Pass,
 }
 
-#[derive(Component)]
-pub struct Shooter;
-
-
-#[derive(Component)]
-pub struct Landed;
-
-
-pub fn get_timer_resource() -> ShootTimer {
-    ShootTimer(Timer::from_seconds(1.0, true))
+enum EnemyDirection {
+    Right,
+    Left,
 }
 
-fn calculate_velocity2(translation: Vec3) -> Velocity {
-    let mut rng = thread_rng();
-    let mut angle: f32 = PI / rng.gen_range(3.0..6.0);
-    let x_force = 200.0 - translation.x;
-    Velocity::from_linear(Vec3::new(
-        x_force * angle.sin(),
-        x_force.abs() * angle.cos(),
-        0.0
-    ))
+impl Distribution<EnemyDirection> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> EnemyDirection {
+        match rng.gen_range(0..=1) {
+            0 => EnemyDirection::Right,
+            _ => EnemyDirection::Left,
+        }
+    }
 }
 
-
-fn calculate_velocity3(translation: Vec3) -> Velocity {
-    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
-    let mut rng = thread_rng();
-    let mut angle: f32 = PI / rng.gen_range(3.0..6.0);
-    let x_force = 200.0 - translation.x;
-    let distance = 200.0 - translation.x;
-
-    let vertical: f32 = rng.gen_range(80.0..600.0);
-    let t = 2.0 * vertical / 600.0;
-
-    let horizontal = distance / t;
-
-    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
-    //println!("H {} V {]")
-
-
-    Velocity::from_linear(Vec3::new(
-        horizontal,
-        vertical,
-        0.0
-    ))
-}
-
-
-fn calculate_velocity(translation: Vec3) -> Velocity {
-    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
-    let mut rng = thread_rng();
-    let distance = 200.0 - translation.x;
-
-    let vertical: f32 = rng.gen_range(80.0..600.0);
-    let g = 600.0;
-
-
-    let t = (vertical + ((vertical * vertical) + 2.0 * translation.y * g).sqrt()) / g;
-
-    let horizontal = distance / t;
-
-    // t = 2 * V₀ * sin(α) / g  ==> t = 2 * V₀ * 1 / g
-    //println!("H {} V {]")
-
-
-    Velocity::from_linear(Vec3::new(
-        horizontal,
-        vertical,
-        0.0
-    ))
-}
-
-
-
-impl Enemy {
-    pub fn new(id: usize) -> Enemy {
-        let mut rng = thread_rng();
-        Enemy {
-            id: id,
-            life: MAX_LIFE,
-            target_x: rng.gen_range(50.0..900.0),
-            bullets: MAX_BULLETS,
+impl EnemyDirection {
+    fn velocity(&self) -> Velocity {
+        match self {
+            Self::Right => Velocity::from_linear(Vec3::X * INITIAL_VELOCITY),
+            Self::Left => Velocity::from_linear(Vec3::X * -INITIAL_VELOCITY),
         }
     }
 
-    fn get_bundle(&self) -> SpriteBundle {
-        let mut rng = thread_rng();
-        SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(-30.0, rng.gen_range(100.0..560.0), 0.0),
-                scale: ENEMY_SIZE,
-                ..default()
-            },
-            sprite: Sprite {
-                color: Color::RED,
-                ..default()
-            },
-            ..default()
+    fn escape_velocity(&self) -> Velocity {
+        match self {
+            Self::Right => Velocity::from_linear(Vec3::X * -INITIAL_VELOCITY),
+            Self::Left => Velocity::from_linear(Vec3::X * INITIAL_VELOCITY),
         }
     }
 
-    pub fn spawn(id: usize, mut commands: Commands) {
-        let enemy = Enemy::new(id);
-        commands
-            .spawn_bundle(enemy.get_bundle())
-            .insert(COLLISION_SHAPE)
-            .insert(RigidBody::KinematicVelocityBased)
-            .insert(Velocity::from_linear(Vec3::X * 100.0))
-            .insert(PhysicMaterial {
+    fn start(&self) -> Vec3 {
+        let mut rng = thread_rng();
+        let height = rng.gen_range(100.0..560.0); // FIXME use constants
+        match self {
+            Self::Right => Vec3::new(-30.0, height, 0.0),
+            Self::Left => Vec3::new(1030.0, height, 0.0), // FIXME use constants
+        }
+    }
+
+    fn escaped(&self, x: f32) -> bool {
+        match self {
+            // FIXME: constants
+            Self::Right => x < -30.0,
+            Self::Left => x > 1030.0,
+        }
+    }
+}
+
+#[derive(Bundle)]
+pub struct EnemyBundle {
+    body: RigidBody,
+    shape: CollisionShape,
+    velocity: Velocity,
+    layer: CollisionLayers,
+    material: PhysicMaterial,
+}
+
+impl Default for EnemyBundle {
+    fn default() -> Self {
+        EnemyBundle {
+            body: RigidBody::KinematicVelocityBased,
+            shape: COLLISION_SHAPE,
+            velocity: Velocity::from_linear(Vec3::X * INITIAL_VELOCITY),
+            layer: CollisionLayers::none()
+                .with_groups(&[world::Layer::Enemies, world::Layer::Trigger])
+                .with_masks(&[
+                    world::Layer::World,
+                    world::Layer::Enemies,
+                    world::Layer::Projectiles,
+                    world::Layer::Explosions,
+                ]),
+            material: PhysicMaterial {
                 friction: 1.0,
                 density: 10.0,
                 restitution: 0.5,
-            })
-            .insert(
-                CollisionLayers::none()
-                    .with_group(world::Layer::Enemies)
-                    .with_masks(&[world::Layer::World, world::Layer::Enemies]),
-            )
-            .insert(enemy);
-    }
-
-    pub fn shoot(&mut self) -> Projectile {
-        self.bullets -= 1;
-        Projectile::new()
-    }
-}
-
-pub fn manage_enemy(
-    mut commands: Commands,
-    mut spawner: ResMut<Spawner>,
-    mut enemy: Query<(&Enemy, &mut Transform, Entity)>,
-) {
-    for (e, transform, entity) in enemy.iter() {
-        if transform.translation.x > 1250.0 {
-            commands.entity(entity).despawn();
-            spawner.despawn();
+            },
         }
     }
 }
 
-pub fn shoot(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut shoot_timer: ResMut<ShootTimer>,
-    asset_server: Res<AssetServer>,
-    mut enemy: Query<(&mut Enemy, &Transform, Entity), With<Shooter>>,
-) {
-    if !shoot_timer.0.tick(time.delta()).just_finished() {
-        return;
-    }
-    for (mut e, transform, entity) in enemy.iter_mut() {
-        if e.bullets < 1 {
-            commands.entity(entity).despawn();
-            continue;
-        }
-        let projectile = e.shoot();
-        commands.spawn_bundle(
-            projectile.sprite(transform.translation, asset_server.as_ref())
-        )
-            .insert_bundle(projectile.get_bundle(transform.translation))
-            .insert(projectile);
-    }
+#[derive(Component)]
+pub struct Enemy {
+    life: f32,
+    initial_life: f32,
+    target_x: f32,
+    direction: EnemyDirection,
+    bullets: usize,
+    location: Vec3,
+    timer: Timer,
+    projectile_type: ProjectileType,
+    color: Color,
 }
 
-pub fn manage_enemy_movement(
-    mut commands: Commands,
-    mut spawner: ResMut<Spawner>,
-    mut enemy: Query<(&Enemy, &Transform, &mut Velocity, Entity)>,
-) {
-    for (e, transform, mut velocity, entity) in enemy.iter_mut() {
-        if velocity.linear == Vec3::ZERO {
-            commands.entity(entity).remove::<Velocity>();
-            commands.entity(entity).insert(Shooter);
-        } else if transform.translation.x > e.target_x {
-            velocity.linear /= Vec3::ONE * 1.03;
-            if velocity.linear.max_element() < 0.05 {
-                velocity.linear = Vec3::ZERO;
-            }
+impl Enemy {
+    pub fn new(t: EnemyType) -> Enemy {
+        let mut rng = thread_rng();
+        let stats = t.get_stats();
+        Enemy {
+            life: stats.0,
+            initial_life: stats.0,
+            bullets: stats.1,
+            timer: Timer::from_seconds(stats.2, true),
+            projectile_type: stats.3,
+            color: stats.4,
+            target_x: rng.gen_range(50.0..410.0), // FIXME use constant
+            direction: rand::random(),
+            location: Vec3::ZERO,
         }
     }
-}
 
+    pub fn create_random() -> Enemy {
+        Self::new(rand::random())
+    }
 
-pub fn collision_tester(
-    mut commands: Commands,
-    mut enemy: Query<&Collisions>,
-) {
-    for (collisions) in enemy.iter_mut() {
-        println!("in outer loop");
-        if !collisions.is_empty() {
-            println!("Touching!");
-            for e in collisions.iter() {
-                println!("Inner loop {:?}", e);
+    pub fn sprite(&self) -> SpriteBundle {
+        SpriteBundle {
+            transform: Transform {
+                translation: self.direction.start(),
+                scale: ENEMY_SIZE,
+                ..Default::default()
+            },
+            sprite: Sprite {
+                color: self.color,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    pub fn get_bundle(&self) -> EnemyBundle {
+        EnemyBundle {
+            velocity: self.direction.velocity(),
+            ..Default::default()
+        }
+    }
+
+    pub fn ready(&mut self, time: Duration) -> bool {
+        self.timer.tick(time).just_finished()
+    }
+
+    pub fn shoot(&mut self, origin: Vec3) -> ShootResult {
+        if self.is_dead() {
+            ShootResult::Pass
+        } else if self.bullets > 0 {
+            self.bullets -= 1;
+            let proj_origin = origin
+                + match self.direction {
+                    // FIXME: The 4.0 is for clearance, until I have a better
+                    // collision shape for enemies
+                    EnemyDirection::Right => {
+                        Vec3::new(4.0 + (ENEMY_SIDE / 2.0), ENEMY_SIDE / 2.0, 0.0)
+                    }
+                    EnemyDirection::Left => {
+                        Vec3::new(-4.0 - (ENEMY_SIDE / 2.0), ENEMY_SIDE / 2.0, 0.0)
+                    }
+                };
+            ShootResult::Fire(Projectile::new(proj_origin, self.projectile_type))
+        } else {
+            ShootResult::GoAway(self.direction.escape_velocity())
+        }
+    }
+
+    pub fn adjust_velocity(&mut self, coordinates: Vec3, velocity: Vec3) -> Option<Vec3> {
+        self.location = coordinates;
+        let should_stop = self.bullets > 0
+            && match self.direction {
+                EnemyDirection::Right => coordinates.x > self.target_x,
+                EnemyDirection::Left => 1000.0 - coordinates.x > self.target_x, // FIXME constant
+            };
+        if should_stop {
+            let new_velocity = velocity * DECELERATION;
+            if new_velocity.x < 0.08 {
+                // FIXME: store position here???
+                None
+            } else {
+                Some(new_velocity)
             }
+        } else {
+            Some(velocity)
+        }
+    }
+
+    pub fn take_damage(&mut self, damage: f32) {
+        self.life -= damage;
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.life <= 0.0
+    }
+
+    // Returns a pseudo collision shape in the form of (center, radius) tuple
+    pub fn as_circle(&self) -> (Vec2, f32) {
+        (self.location.truncate(), 1.05 * ENEMY_SIDE / 2.0)
+    }
+
+    pub fn done(&self) -> bool {
+        self.is_dead() || (self.bullets <= 0 && self.direction.escaped(self.location.x))
+    }
+
+    pub fn get_lifebar(&self) -> Option<Lifebar> {
+        if self.life > 0.0 {
+            Some(Lifebar::new(self.location, self.life / self.initial_life))
+        } else {
+            None
         }
     }
 }
 
-pub fn collision_tester4(
-    mut commands: Commands,
-    mut enemy: Query<(&Collisions, &mut Transform, Entity), With<Projectile>>,
-) {
-    for (collisions, transform, entity) in enemy.iter_mut() {
-        println!("Proj {:?}", entity);
-        if !collisions.is_empty() {
-            println!("Touching!");
-            for e in collisions.iter() {
-                println!("Proj {:?} touches {:?} at {:?}", entity, e, transform.translation);
-            }
+pub enum EnemyType {
+    Weak,
+    Medium,
+    Hard,
+    Demon,
+    Bouncer,
+}
+
+impl Distribution<EnemyType> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> EnemyType {
+        match rng.gen_range(0..=4) {
+            0 => EnemyType::Weak,
+            1 => EnemyType::Medium,
+            2 => EnemyType::Hard,
+            3 => EnemyType::Demon,
+            _ => EnemyType::Bouncer,
         }
     }
 }
 
-
-pub fn collision_tester3(
-    mut commands: Commands,
-    mut collision_events: EventReader<'_, '_, CollisionEvent>,
-    mut enemy: Query<(&mut Transform, Entity), With<Projectile>>,
-) {
-    for (transform, entity) in enemy.iter_mut() {
-        println!("Proj {:?}", entity);
-    }
-    for event in collision_events.iter() {
-        // println!("Event {:?}", event);
-        let (data1, data2) = event.clone().data();
-        // println!("Data {:?} {:?}", data1, data2);
-        let (entity1, entity2) = (data1.rigid_body_entity(), data2.rigid_body_entity());
-        println!("Entities {:?} {:?}", entity1, entity2);
-    }
-}
-
-
-pub fn collision_dectector(
-    mut commands: Commands,
-    mut collision_events: EventReader<'_, '_, CollisionEvent>,
-) {
-    for event in collision_events.iter() {
-        if event.is_started() {
-            // println!("Event {:?}", event);
-            let (data1, data2) = event.clone().data();
-            let (layers1, layers2) = (data1.collision_layers(), data2.collision_layers());
-            let mut projectile: Option<CollisionData> = None;
-            if layers1.contains_group(world::Layer::Projectiles) && layers2.contains_group(world::Layer::World) {
-                projectile = Some(data1);
-            } else if layers2.contains_group(world::Layer::Projectiles) && layers1.contains_group(world::Layer::World) {
-                projectile = Some(data2);
-            }
-            match projectile {
-                Some(data) => {
-                    commands.entity(data.rigid_body_entity()).insert(Landed);
-                },
-                None => (),
-            }
-        }
-    }
-}
-
-pub fn landed(data: CollisionData) -> bool {
-    let layers = data.collision_layers();
-    layers.contains_group(world::Layer::Projectiles) && layers.contains_mask(world::Layer::World)
-}
-
-pub fn landed_system(
-    mut commands: Commands,
-    mut enemy: Query<(&Transform, &mut Projectile, Entity), With<Landed>>,
-) {
-    for (transform, mut projectile, entity) in enemy.iter_mut() {
-        match projectile.touch_ground() {
-            LandEffect::Bounce => {
-                commands.entity(entity).remove::<Landed>();
-            }
-            LandEffect::Explode => {
-                commands.entity(entity).despawn();
-            }
+impl EnemyType {
+    fn get_stats(&self) -> (f32, usize, f32, ProjectileType, Color) {
+        match self {
+            // Life, bullets, shoot-delay, projectile, color
+            Self::Weak => (75.0, 50, 1.5, ProjectileType::WeakShot, Color::CYAN),
+            Self::Medium => (85.0, 50, 2.0, ProjectileType::BigShot, Color::GREEN),
+            Self::Hard => (95.0, 50, 2.2, ProjectileType::HugeShot, Color::ORANGE),
+            Self::Demon => (100.0, 100, 1.5, ProjectileType::HotShot, Color::RED),
+            Self::Bouncer => (110.0, 200, 0.8, ProjectileType::MiniShot, Color::PURPLE),
         }
     }
 }

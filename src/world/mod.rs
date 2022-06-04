@@ -1,6 +1,7 @@
+pub use self::landscape::FLOOR_HEIGHT;
 pub use self::plugin::WorldPlugin;
 
-mod landscape;
+pub mod landscape;
 mod plugin;
 mod systems;
 
@@ -22,6 +23,22 @@ pub enum Layer {
     Enemies,
     Bumpers,
     Projectiles,
+    Trigger, // Anything that makes projectiles to explode upon contact
+    Explosions,
+}
+
+impl Layer {
+    pub fn to_z(&self) -> f32 {
+        match self {
+            Layer::World => 0.0,
+            Layer::Player => 1.0,
+            Layer::Enemies => 2.0,
+            Layer::Bumpers => 3.0,
+            Layer::Projectiles => 4.0,
+            Layer::Trigger => 0.0, // Irrelevant
+            Layer::Explosions => 5.0,
+        }
+    }
 }
 
 pub fn create_camera(mut commands: Commands) {
