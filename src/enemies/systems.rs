@@ -276,7 +276,6 @@ pub fn update_lifebar(mut commands: Commands, enemy_q: Query<&Enemy>) {
     }
 }
 
-
 pub fn update_tower_lifebar(mut commands: Commands, tower_q: Query<&Tower>) {
     for tower in tower_q.iter() {
         if let Some(lifebar) = tower.get_lifebar() {
