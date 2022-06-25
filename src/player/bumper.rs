@@ -27,19 +27,32 @@ impl Bumper {
     }
 
     pub fn fixed_bundle(&self, transform: &Transform) -> ShapeBundle {
+        let angle = dbg!(dbg!(transform.rotation).to_euler(EulerRot::XYZ)).2;
+
+
+        let x = 50.0 * dbg!(angle).cos();
+        let y = 50.0 * angle.sin();
+
         GeometryBuilder::build_as(
-            &shapes::Line(Vec2::new(-50.0, -50.0), Vec2::new(50.0, 50.0)),
-            DrawMode::Stroke(StrokeMode::new(Color::BLUE, 3.0)),
-            Transform {
-                translation: transform.translation,
-                rotation: transform.rotation,
-                ..Default::default()
-            },
+            &shapes::Line(
+                Vec2::new(transform.translation.x - x, transform.translation.y - y),
+                Vec2::new(transform.translation.x + x, transform.translation.y + y)
+            ),
+            DrawMode::Stroke(StrokeMode::new(Color::BLUE, 2.0)),
+            Transform::default(),
         )
+
+
+        // GeometryBuilder::build_as(
+        //     &shapes::Line(Vec2::new(-50.0, 0.0), Vec2::new(50.0, 0.0)),
+        //     DrawMode::Stroke(StrokeMode::new(Color::BLUE, 3.0)),
+        //     *transform,
+        // )
     }
+
     pub fn floating_bundle(&self) -> ShapeBundle {
         GeometryBuilder::build_as(
-            &shapes::Line(Vec2::new(-50.0, -50.0), Vec2::new(50.0, 50.0)),
+            &shapes::Line(Vec2::new(-50.0, 0.0), Vec2::new(50.0, 0.0)),
             DrawMode::Stroke(StrokeMode::new(Color::GRAY, 2.0)),
             Transform::default(),
         )
