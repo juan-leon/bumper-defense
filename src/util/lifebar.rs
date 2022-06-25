@@ -1,12 +1,13 @@
 use bevy::ecs::component::Component;
-use bevy::math::{const_vec3, Vec3};
+use bevy::math::Vec3;
 use bevy::render::color::Color;
 use bevy::sprite::{Sprite, SpriteBundle};
 use bevy::transform::components::Transform;
 
+use crate::world;
+
 const HEIGHT: f32 = 2.0;
 const MAX_LENGHT: f32 = 15.0;
-const Z_VEC: Vec3 = const_vec3!([-10.0, 12.0, 50.0]);
 
 #[derive(Component)]
 pub struct Lifebar {
@@ -17,7 +18,7 @@ pub struct Lifebar {
 impl Lifebar {
     pub fn new(origin: Vec3, pctg: f32) -> Lifebar {
         Lifebar {
-            origin: origin + Z_VEC,
+            origin: origin + Vec3::Z * world::GhostLayers::LifeBars.to_z(),
             pctg: pctg,
         }
     }

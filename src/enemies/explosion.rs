@@ -59,9 +59,9 @@ impl ActiveExplosions {
     pub fn damage_to_rect(&self, top_left: Vec2, bottom_right: Vec2) -> Option<f32> {
         let mut damage: f32 = 0.0;
         for e in self.list.iter() {
-            if (e.location.x + e.radius > top_left.x || e.location.x - e.radius < bottom_right.x)
+            if (e.location.x + e.radius > top_left.x && e.location.x - e.radius < bottom_right.x)
                 && (e.location.y + e.radius > bottom_right.y
-                    || e.location.y - e.radius < top_left.y)
+                    && e.location.y - e.radius < top_left.y)
             {
                 damage += e.damage;
             }

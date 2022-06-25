@@ -229,8 +229,12 @@ impl Enemy {
     }
 
     pub fn get_lifebar(&self) -> Option<Lifebar> {
+        let relative_position = Vec3::new(-ENEMY_SIDE / 2.0, (ENEMY_SIDE + 4.0) / 2.0, 0.0);
         if self.life > 0.0 {
-            Some(Lifebar::new(self.location, self.life / self.initial_life))
+            Some(Lifebar::new(
+                self.location + relative_position,
+                self.life / self.initial_life,
+            ))
         } else {
             None
         }

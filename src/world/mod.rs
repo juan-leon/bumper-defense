@@ -11,10 +11,10 @@ use bevy::window::WindowDescriptor;
 
 use heron::PhysicsLayer;
 
-pub const GRAVITY: f32 = 600.;
-const ASPECT_RATIO: f32 = 9.0 / 16.0;
-const VISIBLE_WORLD_WIDTH: f32 = 1000.0;
-const VISIBLE_WORLD_HEIGHT: f32 = VISIBLE_WORLD_WIDTH * ASPECT_RATIO;
+pub const GRAVITY: f32 = 450.;
+pub const ASPECT_RATIO: f32 = 9.0 / 16.0;
+pub const VISIBLE_WORLD_WIDTH: f32 = 1000.0;
+pub const VISIBLE_WORLD_HEIGHT: f32 = VISIBLE_WORLD_WIDTH * ASPECT_RATIO;
 
 #[derive(PhysicsLayer)]
 pub enum Layer {
@@ -30,13 +30,26 @@ pub enum Layer {
 impl Layer {
     pub fn to_z(&self) -> f32 {
         match self {
-            Layer::World => 0.0,
-            Layer::Player => 1.0,
-            Layer::Enemies => 2.0,
-            Layer::Bumpers => 3.0,
-            Layer::Projectiles => 4.0,
-            Layer::Trigger => 0.0, // Irrelevant
-            Layer::Explosions => 5.0,
+            Self::World => 0.0,
+            Self::Player => 1.0,
+            Self::Enemies => 2.0,
+            Self::Bumpers => 3.0,
+            Self::Projectiles => 4.0,
+            Self::Trigger => 0.0, // Irrelevant
+            Self::Explosions => 5.0,
+        }
+    }
+}
+
+// Layer for non physics bodies
+pub enum GhostLayers {
+    LifeBars,
+}
+
+impl GhostLayers {
+    pub fn to_z(&self) -> f32 {
+        match self {
+            Self::LifeBars => 50.0,
         }
     }
 }

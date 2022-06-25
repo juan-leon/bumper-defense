@@ -9,7 +9,7 @@ pub const POSITION: f32 = 500.0;
 pub const WIDTH: f32 = 15.0;
 pub const HEIGHT: f32 = 35.0;
 
-const INITIAL_LIFE: f32 = 1000.0;
+const INITIAL_LIFE: f32 = 10000.0;
 
 #[derive(Component)]
 pub struct Tower {
@@ -52,8 +52,12 @@ impl Tower {
     }
 
     pub fn get_lifebar(&self) -> Option<Lifebar> {
+        let relative_position = Vec3::new(-WIDTH / 2.0, (HEIGHT + 4.0) / 2.0, 0.0);
         if self.life > 0.0 {
-            Some(Lifebar::new(self.location, self.life / INITIAL_LIFE))
+            Some(Lifebar::new(
+                self.location + relative_position,
+                self.life / INITIAL_LIFE,
+            ))
         } else {
             None
         }

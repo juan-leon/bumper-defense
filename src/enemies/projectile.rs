@@ -17,7 +17,7 @@ use crate::player::tower;
 use crate::world;
 
 const PLAYER_POSITION: f32 = tower::POSITION;
-const VERTICAL_V_RANGE: Range<f32> = 80.0..600.0;
+const VERTICAL_V_RANGE: Range<f32> = 80.0..400.0;
 // FIXME: move to asset related mod
 const SPRITE_SIZE: f32 = 128.0;
 const MAX_TTL: f32 = 8.0;

@@ -28,6 +28,9 @@ pub struct JustLanded;
 pub struct Exploded;
 
 #[derive(Component)]
+pub struct BumperActivated;
+
+#[derive(Component)]
 pub struct Done;
 
 pub fn spawn_enemy(mut commands: Commands, time: Res<Time>, mut spawner: ResMut<Spawner>) {
@@ -226,6 +229,13 @@ pub fn collision_dectector(
                 }
                 None => (),
             }
+            match projectile_bumped(event) {
+                Some(e) => {
+                    commands.entity(e).insert(BumperActivated);
+                    continue;
+                }
+                None => (),
+            }
         }
     }
 }
@@ -258,6 +268,22 @@ fn projectile_landed(event: &CollisionEvent) -> Option<Entity> {
         && layers1.contains_group(world::Layer::World)
     {
         entity = Some(data2.rigid_body_entity());
+    }
+    entity
+}
+
+fn projectile_bumped(event: &CollisionEvent) -> Option<Entity> {
+    let (data1, data2) = event.clone().data();
+    let (layers1, layers2) = (data1.collision_layers(), data2.collision_layers());
+    let mut entity: Option<Entity> = None;
+    if layers1.contains_group(world::Layer::Projectiles)
+        && layers2.contains_group(world::Layer::Bumpers)
+    {
+        entity = Some(data2.rigid_body_entity());
+    } else if layers2.contains_group(world::Layer::Projectiles)
+        && layers1.contains_group(world::Layer::Bumpers)
+    {
+        entity = Some(data1.rigid_body_entity());
     }
     entity
 }

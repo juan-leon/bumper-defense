@@ -6,4 +6,6 @@ mod flasher;
 mod plugin;
 mod projectile;
 mod spawner;
-mod systems;
+// FIXME the pub is needed because of BumperActivated; I should move collision
+// detection elsewhere
+pub mod systems;
