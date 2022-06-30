@@ -115,7 +115,11 @@ impl Bumper {
     }
 
     pub fn take_damage(&mut self) {
-        self.life -= 1.0;
+        self.life -= 1.0
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.life < 0.0
     }
 
     pub fn fix(&mut self, mut entity: EntityCommands, transform: &Transform) {

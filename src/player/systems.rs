@@ -3,22 +3,20 @@ use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ecs::system::EntityCommands;
 use bevy::ecs::system::QuerySingleError;
-use bevy::ecs::system::{Commands, Query, Res};
+use bevy::ecs::system::{Commands, Query, Res, ResMut};
 use bevy::input::keyboard::KeyCode;
 use bevy::input::{ElementState, Input};
 use bevy::math::Quat;
 use bevy::render::color::Color;
 use bevy::sprite::{Sprite, SpriteBundle};
 use bevy::transform::components::Transform;
-use bevy::{
-    input::mouse::{MouseButtonInput, MouseWheel},
-    prelude::*,
-    window::CursorMoved,
-};
+use bevy::ecs::event::EventReader;
+use bevy::input::mouse::{MouseButtonInput, MouseWheel, MouseButton};
+use bevy::window::{Windows, CursorMoved};
 
 use heron::{CollisionLayers, CollisionShape, PhysicMaterial, RigidBody};
 
-use crate::enemies::systems::BumperActivated;
+use crate::util::properties::{BumperActivated, Done};
 use crate::player::bumper::Bumper;
 use crate::player::tower::Tower;
 use crate::world;
@@ -180,6 +178,10 @@ pub fn activated_system(
     for (mut bumper, entity) in bumper_q.iter_mut() {
         commands.entity(entity).remove::<BumperActivated>();
         bumper.take_damage();
+        if bumper.is_dead() {
+            commands.entity(entity).insert(Done);
+            // FIXME add some micro flashers
+        }
     }
 }
 

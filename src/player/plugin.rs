@@ -16,7 +16,8 @@ impl Plugin for PlayerPlugin {
                 .with_system(systems::spawn_or_place_bumper)
                 .with_system(systems::cursor_grab_system)
                 .with_system(systems::move_bumper_with_mouse)
-                .with_system(systems::move_bumper),
+                .with_system(systems::move_bumper)
+                .with_system(systems::activated_system),
         );
     }
 }

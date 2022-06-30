@@ -1,6 +1,5 @@
 use bevy::asset::AssetServer;
 use bevy::core::Time;
-use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::EventReader;
 use bevy::ecs::query::{With, Without};
@@ -16,22 +15,8 @@ use crate::enemies::projectile::{LandEffect, Projectile};
 use crate::enemies::spawner::Spawner;
 use crate::player::tower::Tower;
 use crate::util::lifebar::Lifebar;
+use crate::util::properties::{Shooter, JustLanded, Exploded, BumperActivated, Done};
 use crate::world;
-
-#[derive(Component)]
-pub struct Shooter;
-
-#[derive(Component)]
-pub struct JustLanded;
-
-#[derive(Component)]
-pub struct Exploded;
-
-#[derive(Component)]
-pub struct BumperActivated;
-
-#[derive(Component)]
-pub struct Done;
 
 pub fn spawn_enemy(mut commands: Commands, time: Res<Time>, mut spawner: ResMut<Spawner>) {
     if let Some(enemy) = spawner.spawn_if_ready(time.delta()) {
