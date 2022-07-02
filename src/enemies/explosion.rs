@@ -1,6 +1,6 @@
 use bevy::math::{Vec2, Vec3};
 
-use crate::enemies::flasher::{Flasher, FlasherType};
+use crate::util::flasher::{Flasher, FlasherType};
 
 pub struct Explosion {
     location: Vec2,

@@ -17,6 +17,7 @@ use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 
 use crate::world;
+use crate::util::flasher::{Flasher, FlasherType};
 
 // 3.5 is a lot (since real wdth is the double of that).  Unfortunately,
 // projectiles go throught thin bumpers when they have some speed, as physics
@@ -64,7 +65,7 @@ impl Bumper {
         let stats = t.get_stats();
         Bumper {
             half_length: stats.0,
-            life: stats.1,
+            life: stats.1 / 6.0,  // FIXME remove division
             initial_life: stats.1,
             color: stats.4,
             material: PhysicMaterial {
@@ -122,12 +123,19 @@ impl Bumper {
         self.life < 0.0
     }
 
+    /// Fix floating bumper into the physical world
     pub fn fix(&mut self, mut entity: EntityCommands, transform: &Transform) {
         self.angle = transform.rotation.to_euler(EulerRot::XYZ).2;
         self.transform = Some(*transform);
         entity
             .insert_bundle(self.shape_bundle())
             .insert_bundle(self.body());
+    }
+
+    pub fn get_flasher(&self) -> Flasher {
+        // FIXME expect here or panic
+        let transform = self.transform.expect("Bumper not fixed was requested a flasher!");
+        Flasher::new(transform.translation.truncate(), FlasherType::BumperDeath)
     }
 }
 

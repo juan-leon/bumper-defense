@@ -71,6 +71,7 @@ pub enum FlasherType {
     HotShot,
     MiniShot,
     EnemyDeath,
+    BumperDeath,
 }
 
 impl FlasherType {
@@ -83,6 +84,7 @@ impl FlasherType {
             Self::HotShot => (15.0, Color::RED, 2.2),
             Self::MiniShot => (8.0, Color::BLUE, 1.2),
             Self::EnemyDeath => (18.0, Color::PINK, 2.2),
+            Self::BumperDeath => (10.0, Color::GRAY, 4.0),
         }
     }
 }

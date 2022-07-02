@@ -180,6 +180,8 @@ pub fn activated_system(
         bumper.take_damage();
         if bumper.is_dead() {
             commands.entity(entity).insert(Done);
+            let flasher = bumper.get_flasher();
+            commands.spawn_bundle(flasher.get_bundle()).insert(flasher);
             // FIXME add some micro flashers
         }
     }

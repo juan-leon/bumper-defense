@@ -10,7 +10,7 @@ use heron::{CollisionEvent, Velocity};
 use crate::enemies::enemy::Enemy;
 use crate::enemies::enemy::ShootResult;
 use crate::enemies::explosion::ActiveExplosions;
-use crate::enemies::flasher::{Flasher, FlasherType};
+use crate::util::flasher::{Flasher, FlasherType};
 use crate::enemies::projectile::{LandEffect, Projectile};
 use crate::enemies::spawner::Spawner;
 use crate::player::tower::Tower;
